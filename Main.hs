@@ -5,6 +5,7 @@ import Input
 import Euterpea hiding (Event)
 import Data.List
 import Data.Function
+import qualified Data.Map as Map
 
 -- Directorio predeterminado
 directorio :: String
@@ -19,7 +20,7 @@ longitud = 50
    nueva a partir de este modelo, la imprime por pantalla y la 
    reproduce.
    -}
-componer :: IO ()
+{-componer :: IO ()
 componer = componer' directorio
 
 componer' :: String -> IO ()
@@ -29,7 +30,19 @@ componer' dir = do
   -- let composicion = ...
   putStrLn $ show composicion
   play $ sequenceToMusic composicion
-
+  -}
+crearModelo sec = (length sec, frecOrd0, frecOrd1) where
+   (frecOrd0,frecOrd1) = calcularFrecuencia sec (Map.empty,Map.empty)
+   calcularFrecuencia [] modelo =  modelo
+   calcularFrecuencia [x] (ord0,ord1) = (agregarFrec x ord0, ord1)
+   calcularFrecuencia (x:ys@(y:xs)) (ord0,ord1) = calcularFrecuencia ys (agregarFrec x ord0,agregarFrec (x,y) ord1)
+   agregarFrec e orden
+      | e `Map.member` orden = Map.insert e (frec+1) orden
+      | otherwise = Map.insert e 1 orden
+      where Just frec = Map.lookup e orden 
+      
+     
+  
 {- Recupera las diez secuencias más similares a la k-ésima secuencia 
    de la colección musical en el directorio por defecto, donde la 
    colección musical ha sido ordenada en orden alfabético por el 
@@ -38,7 +51,7 @@ componer' dir = do
    el número de la secuencia (relativo al orden alfabético de la 
    colección), el nombre de archivo y la distancia a la consulta.
    -}
-buscar :: Int -> IO ()
+{-buscar :: Int -> IO ()
 buscar = buscar' directorio
   
 buscar' :: String -> Int -> IO ()
@@ -46,7 +59,7 @@ buscar' dir = do
   seqfns <- loadMusicXmls dir
   let seqfns_ordenados = unzip $ sortBy (compare `on` snd) $ zip seqfns
   -- ...
-
+  -}
 tocar :: Int -> IO ()
 tocar n = do
   seqfns <- loadMusicXmls directorio
