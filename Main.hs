@@ -6,7 +6,7 @@ import Euterpea hiding (Event)
 import Data.List
 import Data.Function
 import qualified Data.Map as Map
-import System.Random 
+import System.Random
 
 type Modelo = (Int, Map.Map Evento Int, Map.Map (Evento,Evento) Int)
 type DistribOrd1 = [((Evento,Evento), Float)]
@@ -41,7 +41,7 @@ componer' dir = do
   play $ sequenceToMusic composicion
   -}
   
-crearModelo:: [Evento] -> Modelo 
+crearModelo:: [Evento] -> Modelo
 crearModelo sec = (length sec, frecOrd0, frecOrd1) where
    (frecOrd0,frecOrd1) = calcularFrecuencia sec (Map.empty,Map.empty)
    calcularFrecuencia [] modelo =  modelo
@@ -57,27 +57,36 @@ convertir modelo = obtenerProb modelo where
    obtenerProb (cant, ord0, ord1) = (normalizar dist0,normalizar dist1) where
       dist0 = map (dividir cant) (Map.toList ord0)
       dist1 = map (dividir (cant-1)) (Map.toList ord1)
-      dividir len (event, frec) = (event, (fromIntegral frec) / (fromIntegral len)) 
+      dividir len (event, frec) = (event, (fromIntegral frec) / (fromIntegral len))
    
 normalizar :: [(a,Float)] -> [(a,Float)]
 normalizar xs = map normAux xs where
    total = sum $ map snd xs
    normAux (e,x) = (e,x / total)
 
--- getStdRandom (randomR (0.0,1.0))   
+-- getStdRandom (randomR (0.0,1.0))
 
 selectEvent :: [(a,Float)] -> Float -> a
-selectEvent dist numero = fst (last (takeWhile (\(x,y) -> y < numero) rango)) where
+selectEvent dist numero = fst (last (takeWhile (\(_,y) -> y < numero) rango)) where
    (event, prob) = unzip dist
-   rango = zip event (tail $ scanl (+) 0 prob)
+   rango = zip event (scanl (+) 0 prob)
    
--- crearComposicion :: ContextoInic -> [Evento]
--- crearComposicion contexto@(dist0,dist1) = auxComposicion contexto [evento] gen where
---    (numero,gen) = randomR (0.0,1.0) semilla
---    evento = selectEvent dist0 numero   
+crearComposicion :: ContextoInic -> IO [Evento]
+crearComposicion contexto@(dist0,dist1) = do
+   numero <- getStdRandom (randomR (0.0,1.0))
+   let evento = selectEvent dist0 numero
+   invertida <- auxComposicion contexto [evento]
+   return (reverse invertida)
 
---auxComposicion :: ContextoInic -> [Evento] -> StdGen -> [Evento]
---auxComposicion contexto@(dist0,dist1) eventos gen  
+-- Al final hacer reverse.
+auxComposicion :: ContextoInic -> [Evento] -> IO [Evento]
+auxComposicion contexto eventos@(e:_)
+   | length eventos /= longitud = do
+      let dist = calcularProb contexto e
+      numero <- getStdRandom (randomR (0.0,1.0))
+      let (_,newEvent) = selectEvent dist numero
+      auxComposicion contexto (newEvent:eventos)
+   | otherwise = return eventos
 
 
 -- P(A/B) = ((B,A),probabilidad)
