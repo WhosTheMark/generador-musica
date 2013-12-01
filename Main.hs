@@ -21,25 +21,23 @@ directorio = "./xml/"
 longitud :: Int
 longitud = 50
 
-semilla :: StdGen
-semilla = mkStdGen 3967
-
 {- Induce un modelo de contexto a partir de la colección musical 
    en el directorio por defecto, genera una secuencia musical 
    nueva a partir de este modelo, la imprime por pantalla y la 
    reproduce.
    -}
-{-componer :: IO ()
+componer :: IO ()
 componer = componer' directorio
 
 componer' :: String -> IO ()
 componer' dir = do
   (seqs, filenames) <- loadMusicXmls dir
-  -- let modelo = ...
-  -- let composicion = ...
+  let modelo = crearModelo $ concat seqs
+  let contexto = convertir modelo
+  composicion <- crearComposicion contexto
   putStrLn $ show composicion
   play $ sequenceToMusic composicion
-  -}
+
   
 crearModelo:: [Evento] -> Modelo
 crearModelo sec = (length sec, frecOrd0, frecOrd1) where
@@ -108,15 +106,40 @@ calcularProb (dist0,dist1) evento = normalizar $ auxProbabilidad dist0 dist1 eve
    el número de la secuencia (relativo al orden alfabético de la 
    colección), el nombre de archivo y la distancia a la consulta.
    -}
-{-buscar :: Int -> IO ()
+buscar :: Int -> IO ()
 buscar = buscar' directorio
   
 buscar' :: String -> Int -> IO ()
-buscar' dir = do
-  seqfns <- loadMusicXmls dir
-  let seqfns_ordenados = unzip $ sortBy (compare `on` snd) $ zip seqfns
-  -- ...
-  -}
+buscar' dir cancion = do
+   (eventos,file) <- loadMusicXmls dir
+   let ordenados = sortBy (compare `on` snd) $ zip eventos file
+       modelosOrd = map (\(s,n) -> (crearModelo s, n)) ordenados
+       modelosEnum = zipWith (\x (s,n) -> (x,s,n)) [1..] modelosOrd 
+       (antes,despues) = splitAt cancion modelosEnum
+       (_,modPrin,_) = last antes
+       (pos,models,nombres) = unzip3 $ (init antes) ++ despues
+       distancias = map (distancia modPrin) models
+       distanciasOrd = sortBy (compare `on` (\(_,_,x)-> x)) $ zip3 pos nombres distancias
+       resultado = take 10 distanciasOrd
+       resultStr = map (\(x,y,z) -> (show x, show y, show z)) resultado
+       listStr = map (\(x,y,z) -> x ++ "\t" ++ y ++ "\t" ++ z) resultStr
+   putStrLn $ unlines listStr
+  
+
+distancia :: Modelo -> Modelo -> Float
+distancia (_,map1ord0,map1ord1) (_,map2ord0,map2ord1) =  sqrt (fromIntegral sumaTotal) where
+   claves0 = union (Map.keys map1ord0) (Map.keys map2ord0)
+   valores1 = map (valor map1ord0) claves0
+   valores2 = map (valor map2ord0) claves0
+   sumaTotal = sum $ zipWith (\x y -> (x - y)^2) valores1 valores2
+ 
+
+valor :: (Ord a) => Map.Map a Int -> a -> Int
+valor mapa clave
+   | Map.member clave mapa = v
+   | otherwise = 0
+   where Just v = Map.lookup clave mapa  
+  
 tocar :: Int -> IO ()
 tocar n = do
   seqfns <- loadMusicXmls directorio
