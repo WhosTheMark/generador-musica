@@ -128,12 +128,14 @@ buscar' dir cancion = do
 
 distancia :: Modelo -> Modelo -> Float
 distancia (_,map1ord0,map1ord1) (_,map2ord0,map2ord1) =  sqrt (fromIntegral sumaTotal) where
-   claves0 = union (Map.keys map1ord0) (Map.keys map2ord0)
-   valores1 = map (valor map1ord0) claves0
-   valores2 = map (valor map2ord0) claves0
-   sumaTotal = sum $ zipWith (\x y -> (x - y)^2) valores1 valores2
+   sumaTotal = (sumar map1ord0 map2ord0) + (sumar map1ord1 map2ord1)
  
-
+sumar :: (Ord a) => Map.Map a Int -> Map.Map a Int -> Int
+sumar mapa1 mapa2 = sum $ zipWith (\x y -> (x-y)^2) valores1 valores2 where
+   claves = union (Map.keys mapa1) (Map.keys mapa2)
+   valores1 = map (valor mapa1) claves
+   valores2 = map (valor mapa2) claves
+ 
 valor :: (Ord a) => Map.Map a Int -> a -> Int
 valor mapa clave
    | Map.member clave mapa = v
