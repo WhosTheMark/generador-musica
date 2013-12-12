@@ -8,9 +8,17 @@ import Data.Function
 import qualified Data.Map as Map
 import System.Random
 
+{- Modelo con la longitud de la secuencia musical y las frencuencias 
+   de los eventos de orden 0 y orden 1. -}
 type Modelo = (Int, Map.Map Evento Int, Map.Map (Evento,Evento) Int)
-type DistribOrd1 = [((Evento,Evento), Float)]
+
+{- Distribucion de orden 0: Una lista de eventos con sus probabilidades. -}
 type DistribOrd0 = [(Evento, Float)]
+
+{- Distribucion de orden 1: Una lista de eventos con sus probabilidades. -}
+type DistribOrd1 = [((Evento,Evento), Float)]
+
+{- Contexto inicial que contiene las distribuciones de orden 0 y orden 1. -}
 type ContextoInic = (DistribOrd0,DistribOrd1)
 
 -- Directorio predeterminado
@@ -21,6 +29,10 @@ directorio = "./xml/"
 longitud :: Int
 longitud = 50
 
+-- Funcion main
+main :: IO ()
+main = componer
+
 {- Induce un modelo de contexto a partir de la colección musical 
    en el directorio por defecto, genera una secuencia musical 
    nueva a partir de este modelo, la imprime por pantalla y la 
@@ -29,6 +41,9 @@ longitud = 50
 componer :: IO ()
 componer = componer' directorio
 
+{- Funcion auxiliar de componer. Lee las secuencias musicales de los archivos
+   dados, crea un modelo con las secuencias concatenadas, crea un contexto en
+   base este modelo y crea una composicion a partir del contexto creado. -}
 componer' :: String -> IO ()
 componer' dir = do
   (seqs, filenames) <- loadMusicXmls dir
@@ -38,7 +53,8 @@ componer' dir = do
   putStrLn $ show composicion
   play $ sequenceToMusic composicion
 
-  
+{- Crea un modelo en base de la lista de eventos dados. Calcula las frecuencias
+   de cada evento de orden 0 y orden 1. -}
 crearModelo:: [Evento] -> Modelo
 crearModelo sec = (length sec, frecOrd0, frecOrd1) where
    (frecOrd0,frecOrd1) = calcularFrecuencia sec (Map.empty,Map.empty)
@@ -50,25 +66,29 @@ crearModelo sec = (length sec, frecOrd0, frecOrd1) where
       | otherwise = Map.insert e 1 orden
       where Just frec = Map.lookup e orden 
 
+{- Obtiene las probabilidades de cada evento en base al modelo dado para
+   crear el contexto inicial de una secuencia musical. -}
 convertir:: Modelo -> ContextoInic
 convertir modelo = obtenerProb modelo where
    obtenerProb (cant, ord0, ord1) = (normalizar dist0,normalizar dist1) where
       dist0 = map (dividir cant) (Map.toList ord0)
       dist1 = map (dividir (cant-1)) (Map.toList ord1)
       dividir len (event, frec) = (event, (fromIntegral frec) / (fromIntegral len))
-   
+
+{- Normaliza una distribucion dada. -}      
 normalizar :: [(a,Float)] -> [(a,Float)]
 normalizar xs = map normAux xs where
    total = sum $ map snd xs
    normAux (e,x) = (e,x / total)
 
--- getStdRandom (randomR (0.0,1.0))
-
+{- Dado una distribucion y un numero random, se elige un evento en base a las
+   probabilidades de los eventos posibles. -}
 selectEvent :: [(a,Float)] -> Float -> a
 selectEvent dist numero = fst (last (takeWhile (\(_,y) -> y < numero) rango)) where
    (event, prob) = unzip dist
    rango = zip event (scanl (+) 0 prob)
    
+{- Crea una composicion dado un contexto. -}
 crearComposicion :: ContextoInic -> IO [Evento]
 crearComposicion contexto@(dist0,dist1) = do
    numero <- getStdRandom (randomR (0.0,1.0))
@@ -76,7 +96,8 @@ crearComposicion contexto@(dist0,dist1) = do
    invertida <- auxComposicion contexto [evento]
    return (reverse invertida)
 
--- Al final hacer reverse.
+{- Subrutina auxiliar para crear una composicion, se seleccionan eventos hasta 
+   que la longitud de la secuencia sea igual a 50. -}
 auxComposicion :: ContextoInic -> [Evento] -> IO [Evento]
 auxComposicion contexto eventos@(e:_)
    | length eventos /= longitud = do
@@ -86,9 +107,8 @@ auxComposicion contexto eventos@(e:_)
       auxComposicion contexto (newEvent:eventos)
    | otherwise = return eventos
 
-
--- P(A/B) = ((B,A),probabilidad)
-
+{- Calcula las probabilidades de una distribucion de orden 1 
+   dado un contexto inicial y un evento. -}
 calcularProb :: ContextoInic -> Evento -> DistribOrd1
 calcularProb (dist0,dist1) evento = normalizar $ auxProbabilidad dist0 dist1 evento [] where
    auxProbabilidad [] _ _ aux = aux
@@ -109,9 +129,20 @@ calcularProb (dist0,dist1) evento = normalizar $ auxProbabilidad dist0 dist1 eve
 buscar :: Int -> IO ()
 buscar = buscar' directorio
   
+{- Verifica si el numero de la secuencia dada esta en el rango de canciones
+   disponibles. Luego llama un subrutina auxiliar para calcular las diez 
+   secuencias mas similares al numero de secuencia dada. -}
 buscar' :: String -> Int -> IO ()
 buscar' dir cancion = do
    (eventos,file) <- loadMusicXmls dir
+   if (cancion > 0) && (cancion <= length eventos) then
+      buscar'' (eventos,file) cancion
+      else
+         putStrLn "Indice fuera de rango"
+   
+{- Calcula las diez secuencias mas similares al numero de secuencia dada. -}
+buscar'' :: ([[Evento]], [String]) -> Int -> IO ()
+buscar'' (eventos,file) cancion = do   
    let ordenados = sortBy (compare `on` snd) $ zip eventos file
        modelosOrd = map (\(s,n) -> (crearModelo s, n)) ordenados
        modelosEnum = zipWith (\x (s,n) -> (x,s,n)) [1..] modelosOrd 
@@ -125,17 +156,20 @@ buscar' dir cancion = do
        listStr = map (\(x,y,z) -> x ++ "\t" ++ y ++ "\t" ++ z) resultStr
    putStrLn $ unlines listStr
   
-
+{- Calcula la distancia entre dos modelos. -}  
 distancia :: Modelo -> Modelo -> Float
 distancia (_,map1ord0,map1ord1) (_,map2ord0,map2ord1) =  sqrt (fromIntegral sumaTotal) where
    sumaTotal = (sumar map1ord0 map2ord0) + (sumar map1ord1 map2ord1)
  
+{- Suma los valores de las claves de dos mapas asociativos. -}
 sumar :: (Ord a) => Map.Map a Int -> Map.Map a Int -> Int
 sumar mapa1 mapa2 = sum $ zipWith (\x y -> (x-y)^2) valores1 valores2 where
    claves = union (Map.keys mapa1) (Map.keys mapa2)
    valores1 = map (valor mapa1) claves
    valores2 = map (valor mapa2) claves
  
+{- Si la clave dada existe en el mapa asociativo, devuelve el valor de esta.
+   Si no, devuelve cero. -} 
 valor :: (Ord a) => Map.Map a Int -> a -> Int
 valor mapa clave
    | Map.member clave mapa = v
