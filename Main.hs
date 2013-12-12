@@ -135,27 +135,23 @@ buscar = buscar' directorio
 buscar' :: String -> Int -> IO ()
 buscar' dir cancion = do
    (eventos,file) <- loadMusicXmls dir
-   if (cancion > 0) && (cancion <= length eventos) then
-      buscar'' (eventos,file) cancion
+   if (cancion > 0) && (cancion <= length eventos) 
+      then do
+         let   ordenados = sortBy (compare `on` snd) $ zip eventos file
+               modelosOrd = map (\(s,n) -> (crearModelo s, n)) ordenados
+               modelosEnum = zipWith (\x (s,n) -> (x,s,n)) [1..] modelosOrd 
+               (antes,despues) = splitAt cancion modelosEnum
+               (_,modPrin,_) = last antes
+               (pos,models,nombres) = unzip3 $ (init antes) ++ despues
+               distancias = map (distancia modPrin) models
+               distanciasOrd = sortBy (compare `on` (\(_,_,x)-> x)) $ zip3 pos nombres distancias
+               resultado = take 10 distanciasOrd
+               resultStr = map (\(x,y,z) -> (show x, show y, show z)) resultado
+               listStr = map (\(x,y,z) -> x ++ "\t" ++ y ++ "\t" ++ z) resultStr
+         putStrLn $ unlines listStr
       else
          putStrLn "Indice fuera de rango"
-   
-{- Calcula las diez secuencias mas similares al numero de secuencia dada. -}
-buscar'' :: ([[Evento]], [String]) -> Int -> IO ()
-buscar'' (eventos,file) cancion = do   
-   let ordenados = sortBy (compare `on` snd) $ zip eventos file
-       modelosOrd = map (\(s,n) -> (crearModelo s, n)) ordenados
-       modelosEnum = zipWith (\x (s,n) -> (x,s,n)) [1..] modelosOrd 
-       (antes,despues) = splitAt cancion modelosEnum
-       (_,modPrin,_) = last antes
-       (pos,models,nombres) = unzip3 $ (init antes) ++ despues
-       distancias = map (distancia modPrin) models
-       distanciasOrd = sortBy (compare `on` (\(_,_,x)-> x)) $ zip3 pos nombres distancias
-       resultado = take 10 distanciasOrd
-       resultStr = map (\(x,y,z) -> (show x, show y, show z)) resultado
-       listStr = map (\(x,y,z) -> x ++ "\t" ++ y ++ "\t" ++ z) resultStr
-   putStrLn $ unlines listStr
-  
+
 {- Calcula la distancia entre dos modelos. -}  
 distancia :: Modelo -> Modelo -> Float
 distancia (_,map1ord0,map1ord1) (_,map2ord0,map2ord1) =  sqrt (fromIntegral sumaTotal) where
